@@ -199,8 +199,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                         Log.e("Removal", shoppingList.toString());
-                    }
-                    else {
+                    } else {
                         editor.putStringSet("al", new TreeSet<String>());
                         editor.commit();
                     }
