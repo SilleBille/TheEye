@@ -29,7 +29,9 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 
+import static android.R.id.edit;
 import static android.R.id.message;
+import static android.R.id.shareText;
 
 /**
  * Created by gsudan92 on 11/4/2017.
@@ -106,29 +108,54 @@ public class ApiUtil {
                             }
 
                             if (text.length() > 0) {
+                                    SharedPreferences.Editor editor = sharedpreferences.edit();
                                     Set<String> shoppingList = sharedpreferences.getStringSet("sl",new TreeSet<String>());
+                                    Set<String> actionList = sharedpreferences.getStringSet("al",new TreeSet<String>());
+                                    int exploreMode = sharedpreferences.getInt("em",0);
                                     Iterator iterator = shoppingList.iterator();
                                     String talk = null;
                                     boolean flag = false;
-                                    while(iterator.hasNext()){
-                                        String currentString = (String)iterator.next();
-                                        String text1 = text.replace(",","");
-                                        String words[] = text1.split(" ");
-                                        for(int i=0;i<words.length;++i)
-                                        {
-                                            if(words[i].equalsIgnoreCase(currentString)){
-                                                flag = true;
-                                                shoppingList.remove(currentString);
-                                                talk = currentString;
-                                                SharedPreferences.Editor editor = sharedpreferences.edit();
-                                                editor.putStringSet("sl",shoppingList);
-                                                editor.commit();
-                                                break;
+                                    if(actionList.size()==0) {
+                                        String removeString = null;
+                                        while (iterator.hasNext()) {
+                                            String currentString = (String) iterator.next();
+                                            String text1 = text.replace(",", "");
+                                            String words[] = text1.split(" ");
+                                            for (int i = 0; i < words.length; ++i) {
+                                                if (words[i].equalsIgnoreCase(currentString)) {
+                                                    flag = true;
+                                                    removeString = currentString;
+                                                    talk = currentString;
+                                                    break;
+                                                }
                                             }
                                         }
+                                        if (flag && talk != null && exploreMode == 0) {
+                                            shoppingList.remove(removeString);
+                                            editor.putStringSet("sl", shoppingList);
+                                            editor.commit();
+                                            TextToSpeechAPI.speak(tts, "Found item " + talk);
+                                        }
+                                        else if(exploreMode == 1) {
+                                            TextToSpeechAPI.speak(tts, text);
+                                        }
                                     }
-                                    if(flag && talk!=null) {
-                                        TextToSpeechAPI.speak(tts, talk);
+                                    else {
+                                        String speech = "";
+                                        while(iterator.hasNext()) {
+                                            String currentString = (String) iterator.next();
+                                            speech += currentString;
+                                            speech += ", ";
+                                        }
+                                        if(!speech.equalsIgnoreCase("")) {
+                                            TextToSpeechAPI.speak(tts, speech);
+                                        }
+                                        else {
+                                            TextToSpeechAPI.speak(tts, "Shopping list is empty");
+                                        }
+                                        actionList = new TreeSet<String>();
+                                        editor.putStringSet("al",actionList);
+                                        editor.commit();
                                     }
                             }
 

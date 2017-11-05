@@ -29,6 +29,7 @@ import com.ada.pongada.atlas.tts.TextToSpeechAPI;
 import com.ada.pongada.atlas.util.ApiUtil;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
@@ -40,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
     private static int speakingMode;
     private static SharedPreferences sharedpreferences;
     private final int REQ_CODE_SPEECH_INPUT = 100;
+    private int exploreMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,8 +50,12 @@ public class MainActivity extends AppCompatActivity {
         this.speakingMode = 1;
         this.sharedpreferences = getSharedPreferences("Retina", Context.MODE_PRIVATE);
         Set<String> shoppingList = new TreeSet<String>();
+        Set<String> actionList = new TreeSet<String>();
+        this.exploreMode = 0;
         SharedPreferences.Editor editor = sharedpreferences.edit();
         editor.putStringSet("sl",shoppingList);
+        editor.putStringSet("al",actionList);
+        editor.putInt("em",this.exploreMode);
         editor.commit();
 
         //Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -148,7 +154,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP)){
-            this.askSpeechInput();
+            SharedPreferences.Editor editor = sharedpreferences.edit();
+            if(this.exploreMode == 0) this.exploreMode = 1;
+            else if(this.exploreMode == 1) this.exploreMode = 0;
+            editor.putInt("em", this.exploreMode);
+            editor.commit();
         }
         return true;
     }
@@ -166,10 +176,34 @@ public class MainActivity extends AppCompatActivity {
                             .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                     //voiceInput.setText(result.get(0));
                     SharedPreferences.Editor editor = sharedpreferences.edit();
+                    Set<String> actionList = sharedpreferences.getStringSet("al", new TreeSet<String>());
                     Set<String> shoppingList = sharedpreferences.getStringSet("sl", new TreeSet<String>());
-                    shoppingList.add(result.get(0));
-                    Log.e("Shopping list", shoppingList.toString());
-                    editor.putStringSet("sl",shoppingList);
+                    String command[] = result.get(0).split(" ");
+                    if(command[0].equalsIgnoreCase("add") && command[1].equalsIgnoreCase("item") && command.length == 3){
+                        //shoppingList.add(result.get(0));
+                        shoppingList.add(command[2]);
+                        Log.e("Shopping list", shoppingList.toString());
+                        editor.putStringSet("sl",shoppingList);
+                    } else if(command[0].equalsIgnoreCase("view") &&
+                            (command[1].equalsIgnoreCase("cart") || command[1].equalsIgnoreCase("list"))) {
+                        actionList.add("view");
+                        editor.putStringSet("al",actionList);
+                    } else if(command[0].equalsIgnoreCase("remove") && command[1].equalsIgnoreCase("item") && command.length == 3) {
+                        Iterator iterator = actionList.iterator();
+                        while(iterator.hasNext()) {
+                            String currentElement = (String)iterator.next();
+                            if(currentElement.equalsIgnoreCase(command[2])) {
+                                shoppingList.remove(currentElement);
+                                editor.putStringSet("sl",shoppingList);
+                                break;
+                            }
+                        }
+                        Log.e("Removal", shoppingList.toString());
+                    }
+                    else {
+                        editor.putStringSet("al", new TreeSet<String>());
+                        editor.commit();
+                    }
                 }
                 break;
             }

@@ -654,7 +654,7 @@ public class CameraFragment extends Fragment {
             Log.i(TAG, "InsideImage LIstener");
             //writeToFile(output);
             long currentTime = System.currentTimeMillis();
-            if(currentTime - pastTime > 3000) {
+            if(currentTime - pastTime > 1500) {
                 Log.i(TAG, "Sending Request");
                 createRequestAndSend(output, tts);
                 pastTime = currentTime;
