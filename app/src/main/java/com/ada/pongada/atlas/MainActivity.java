@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
 import android.support.design.widget.FloatingActionButton;
@@ -199,7 +200,15 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                         Log.e("Removal", shoppingList.toString());
-                    } else {
+                    } else if(command[0].equalsIgnoreCase("thank") && command[1].equalsIgnoreCase("you")) {
+                        TextToSpeechAPI.speak(CameraFragment.tts, "Have a nice day!");
+                        new Handler().postDelayed(new Runnable() {
+                            public void run() {
+                                finish();
+                            }
+                        }, 1500);
+                    }
+                    else {
                         editor.putStringSet("al", new TreeSet<String>());
                         editor.commit();
                     }

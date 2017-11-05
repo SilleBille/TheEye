@@ -317,6 +317,13 @@ public class CameraFragment extends Fragment {
     }
 
     @Override
+    public void onDetach () {
+        super.onDetach();
+        if(tts != null)
+            tts.shutdown();
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         startBackgroundThread();
@@ -630,7 +637,7 @@ public class CameraFragment extends Fragment {
             e.printStackTrace();
         }
     }
-    private TextToSpeech tts;
+    public static TextToSpeech tts;
 
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {

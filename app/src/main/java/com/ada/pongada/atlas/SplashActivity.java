@@ -31,7 +31,7 @@ public class SplashActivity extends AppCompatActivity {
             @Override
             public void onInit(int status) {
                 if (status == TextToSpeech.SUCCESS) {
-                    int result = introSpeech.setLanguage(Locale.UK);
+                    int result = introSpeech.setLanguage(Locale.US);
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                         Log.e("TTS", "This Language is not supported");
                     }
@@ -53,6 +53,13 @@ public class SplashActivity extends AppCompatActivity {
                 SplashActivity.this.finish();
             }
         }, SPLASH_DISPLAY_LENGTH);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if(introSpeech!=null)
+            introSpeech.shutdown();
     }
 }
 
