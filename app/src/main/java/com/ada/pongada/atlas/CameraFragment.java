@@ -25,6 +25,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
@@ -39,14 +41,18 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
+import android.util.Base64;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.LayoutInflater;
@@ -54,8 +60,21 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.ada.pongada.atlas.pojo.VisionFeatureObject;
+import com.ada.pongada.atlas.pojo.VisionImageObject;
+import com.ada.pongada.atlas.pojo.VisionRequest;
+import com.ada.pongada.atlas.pojo.VisionRequestWrapper;
+import com.ada.pongada.atlas.util.ApiUtil;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,7 +88,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class CameraFragment extends Fragment {
 
-    private  static final String TAG = CameraFragment.class.getSimpleName();
+    private static final String TAG = CameraFragment.class.getSimpleName();
 /*    // =========== OLD CODE ==============
     private String cameraId;
     private Size imageDimension;
@@ -87,7 +106,7 @@ public class CameraFragment extends Fragment {
      * The camera preview size will be chosen to be the smallest frame by pixel size capable of
      * containing a DESIRED_SIZE x DESIRED_SIZE square.
      */
-    private static final int MINIMUM_PREVIEW_SIZE = 320;
+    private static final int MINIMUM_PREVIEW_SIZE = 1024;
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -112,6 +131,7 @@ public class CameraFragment extends Fragment {
                 public void onSurfaceTextureAvailable(
                         final SurfaceTexture texture, final int width, final int height) {
                     openCamera(width, height);
+                    pastTime = System.currentTimeMillis();
                 }
 
                 @Override
@@ -126,7 +146,8 @@ public class CameraFragment extends Fragment {
                 }
 
                 @Override
-                public void onSurfaceTextureUpdated(final SurfaceTexture texture) {}
+                public void onSurfaceTextureUpdated(final SurfaceTexture texture) {
+                }
             };
 
     /**
@@ -135,9 +156,9 @@ public class CameraFragment extends Fragment {
     private String cameraId;
 
     /**
-     * An {@link TextureView} for camera preview.
+     * An {@link AutoFitTextureView} for camera preview.
      */
-    private TextureView textureView;
+    private AutoFitTextureView textureView;
 
     /**
      * A {@link CameraCaptureSession } for camera preview.
@@ -168,9 +189,11 @@ public class CameraFragment extends Fragment {
                 @Override
                 public void onOpened(final CameraDevice cd) {
                     // This method is called when the camera is opened.  We start camera preview here.
+
                     cameraOpenCloseLock.release();
                     cameraDevice = cd;
                     createCameraPreviewSession();
+
                 }
 
                 @Override
@@ -250,8 +273,13 @@ public class CameraFragment extends Fragment {
         }
     }
 
+    private Range<Integer> range[];
+
+    private File mFile;
+
     public CameraFragment() {
     }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
@@ -263,12 +291,13 @@ public class CameraFragment extends Fragment {
 
     @Override
     public void onViewCreated(final View view, final Bundle savedInstanceState) {
-        textureView = (TextureView) view.findViewById(R.id.camera_preview);
+        textureView = (AutoFitTextureView) view.findViewById(R.id.camera_preview);
     }
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+//        mFile = new File("/storage/emulated/0/", "pic.jpg");
     }
 
     @Override
@@ -303,7 +332,7 @@ public class CameraFragment extends Fragment {
         final CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
             // Get the backfacing camera
-            cameraId = manager.getCameraIdList()[0];
+            //cameraId = manager.getCameraIdList()[0];
 
             if (!cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Time out waiting to lock camera opening.");
@@ -332,12 +361,13 @@ public class CameraFragment extends Fragment {
         // Collect the supported resolutions that are at least as big as the preview Surface
         final List<Size> bigEnough = new ArrayList<Size>();
         for (final Size option : choices) {
-            if (option.getHeight() >= MINIMUM_PREVIEW_SIZE && option.getWidth() >= MINIMUM_PREVIEW_SIZE) {
+            if (option.getHeight() == 1280 && option.getWidth() == 960) {
                 Log.i(TAG, "Adding size: " + option.getWidth() + "x" + option.getHeight());
-                bigEnough.add(option);
+
             } else {
                 Log.i(TAG, "Not adding size: " + option.getWidth() + "x" + option.getHeight());
             }
+            bigEnough.add(new Size(1280, 960));
         }
 
         // Pick the smallest of those, assuming we found any
@@ -363,6 +393,11 @@ public class CameraFragment extends Fragment {
         try {
             for (final String cameraId : manager.getCameraIdList()) {
                 final CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+                range = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+
+                for (Range i : range) {
+                    Log.i(TAG, "Available range: " + i.getLower() + " to " + i.getUpper());
+                }
 
                 // We don't use a front facing camera in this sample.
                 final Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
@@ -380,8 +415,12 @@ public class CameraFragment extends Fragment {
                 // For still image captures, we use the largest available size.
                 final Size largest =
                         Collections.max(
-                                Arrays.asList(map.getOutputSizes(ImageFormat.YUV_420_888)),
+                                Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                                 new CompareSizesByArea());
+
+                previewReader = ImageReader.newInstance(largest.getWidth()/4, largest.getHeight()/4, ImageFormat.JPEG, 2);
+                previewReader.setOnImageAvailableListener(
+                        mOnImageAvailableListener, backgroundHandler);
 
                 sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
 
@@ -521,20 +560,205 @@ public class CameraFragment extends Fragment {
         }
     }
 
+    long pastTime;
+    Bitmap bMap;
     private final CameraCaptureSession.CaptureCallback captureCallback =
             new CameraCaptureSession.CaptureCallback() {
+
+
                 @Override
                 public void onCaptureProgressed(
                         final CameraCaptureSession session,
                         final CaptureRequest request,
-                        final CaptureResult partialResult) {}
+                        final CaptureResult partialResult) {
+                }
+
 
                 @Override
                 public void onCaptureCompleted(
                         final CameraCaptureSession session,
                         final CaptureRequest request,
-                        final TotalCaptureResult result) {}
+                        final TotalCaptureResult result) {
+                    // Log.i(TAG, "onComplete");
+
+                }
             };
+
+    private void captureStillPicture(CameraCaptureSession session) {
+        try {
+            final Activity activity = getActivity();
+            if (null == activity || null == cameraDevice) {
+                return;
+            }
+            // This is the CaptureRequest.Builder that we use to take a picture.
+            final CaptureRequest.Builder captureBuilder =
+                    cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(previewReader.getSurface());
+
+            /*// Use the same AE and AF modes as the preview.
+            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+*/
+            CameraCaptureSession.CaptureCallback CaptureCallback
+                    = new CameraCaptureSession.CaptureCallback() {
+
+                @Override
+                public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                               @NonNull CaptureRequest request,
+                                               @NonNull TotalCaptureResult result) {
+                    Log.i(TAG, "CAPUTIRNG>...");
+                }
+            };
+            session.capture(captureBuilder.build(), CaptureCallback, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
+            = new ImageReader.OnImageAvailableListener() {
+
+        @Override
+        public void onImageAvailable(ImageReader reader) {
+            Image image = reader.acquireNextImage();
+            Log.i(TAG, image.getWidth() + " " + image.getHeight() + " " + image.getFormat());
+            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+
+            bMap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            //Log.i(TAG, bMap.getByteCount() + "");
+//            demoView.setImageBitmap(bMap);
+
+            Log.i(TAG, "Size of image: " + bytes.length);
+            String output = Base64.encodeToString(bytes,
+                    Base64.NO_WRAP);
+            Log.i(TAG, output);
+            Log.i(TAG, "InsideImage LIstener");
+            //writeToFile(output);
+            long currentTime = System.currentTimeMillis();
+            if(currentTime - pastTime > 2000) {
+                Log.i(TAG, "Sending Request");
+                createRequestAndSend(output);
+                pastTime = currentTime;
+                writeToFile(output);
+            }
+            image.close();
+            // backgroundHandler.post(new ImageHandler(reader.acquireNextImage(), mFile));
+        }
+
+    };
+
+    public void createRequestAndSend(String base64Img) {
+        // Sample Request
+        String content = base64Img;
+        //String content = getString(R.string.SampleString);
+        VisionImageObject image = new VisionImageObject();
+        image.setContent(content);
+
+        VisionFeatureObject feature1 = new VisionFeatureObject();
+        feature1.setType("LOGO_DETECTION");
+        feature1.setMaxResult(3);
+
+        VisionFeatureObject feature2 = new VisionFeatureObject();
+        feature2.setType("LABEL_DETECTION");
+        feature2.setMaxResult(3);
+
+        VisionRequest requestData = new VisionRequest();
+        requestData.setImage(image);
+        requestData.setFeatures(new ArrayList<VisionFeatureObject>());
+        requestData.getFeatures().add(feature1);
+        requestData.getFeatures().add(feature2);
+
+        VisionRequestWrapper requests = new VisionRequestWrapper();
+        requests.setRequests(new ArrayList<VisionRequest>());
+        requests.getRequests().add(requestData);
+
+        // ApiUtil.sendPostVisionAPI();
+        ApiUtil.sendPostVisionAPI(requests, getContext(), getActivity());
+    }
+
+    public void writeToFile(String data)
+    {
+        Log.i(TAG, "SIze of string: " + data.length());
+        // Get the directory for the user's public pictures directory.
+        final File path =
+                Environment.getExternalStoragePublicDirectory
+                        (
+                                //Environment.DIRECTORY_PICTURES
+                                Environment.DIRECTORY_DCIM
+                        );
+
+        // Make sure the path directory exists.
+        if(!path.exists())
+        {
+            // Make it, if it doesn't exit
+            path.mkdirs();
+        }
+
+        final File file = new File(path, "config.txt");
+
+        // Save your stream, don't forget to flush() it before closing it.
+
+        try
+        {
+            file.createNewFile();
+            FileOutputStream fOut = new FileOutputStream(file);
+            OutputStreamWriter myOutWriter = new OutputStreamWriter(fOut);
+            myOutWriter.append(data);
+
+            myOutWriter.close();
+
+            fOut.flush();
+            fOut.close();
+        }
+        catch (IOException e)
+        {
+            Log.e("Exception", "File write failed: " + e.toString());
+        }
+    }
+
+    private static class ImageHandler implements Runnable {
+
+        private final Image mImage;
+        private final File mFile;
+
+        public ImageHandler(Image image, File file) {
+            mImage = image;
+            mFile = file;
+        }
+
+        @Override
+        public void run() {
+            ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+            Log.i(TAG, "Size of image: " + bytes.length);
+            String output = Base64.encodeToString(bytes,
+                    Base64.NO_WRAP);
+            Log.i(TAG, output);
+            FileOutputStream op = null;
+            try {
+                op = new FileOutputStream(mFile);
+                op.write(bytes);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                mImage.close();
+
+                if (null != op) {
+                    try {
+                        op.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                // System.exit(0);
+            }
+        }
+    }
+
 
     /**
      * Creates a new {@link CameraCaptureSession} for camera preview.
@@ -542,6 +766,11 @@ public class CameraFragment extends Fragment {
     private void createCameraPreviewSession() {
         try {
             final SurfaceTexture texture = textureView.getSurfaceTexture();
+
+            // MKD =========
+            Surface mImageSurface = previewReader.getSurface();
+
+
             assert texture != null;
 
             // We configure the size of default buffer to be the size of camera preview we want.
@@ -552,17 +781,23 @@ public class CameraFragment extends Fragment {
 
             // We set up a CaptureRequest.Builder with the output Surface.
             previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            previewRequestBuilder.addTarget(mImageSurface);
             previewRequestBuilder.addTarget(surface);
 
             Log.i(TAG, "Opening camera preview: " + previewSize.getWidth() + "x" + previewSize.getHeight());
 
-            // Create the reader for the preview frames.
+           /* // Create the reader for the preview frames.
             previewReader =
                     ImageReader.newInstance(
-                            previewSize.getWidth(), previewSize.getHeight(), ImageFormat.YUV_420_888, 2);
+                            previewSize.getWidth(), previewSize.getHeight(), ImageFormat.YUV_420_888, 1);
+
+            previewReader.setOnImageAvailableListener(mOnImageAvailableListener, backgroundHandler);*/
+
+            // previewReader.setOnImageAvailableListener(mOnImageAvailableListener, mBackgroundHandler);
 
             // previewReader.setOnImageAvailableListener(tfPreviewListener, backgroundHandler);
             // previewRequestBuilder.addTarget(previewReader.getSurface());
+
 
             // Here, we create a CameraCaptureSession for camera preview.
             cameraDevice.createCaptureSession(
@@ -587,6 +822,9 @@ public class CameraFragment extends Fragment {
                                 previewRequestBuilder.set(
                                         CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
 
+                                Log.i(TAG, "Setting FPS to :" + range[0].getLower() + " - " + range[0].getUpper());
+                                previewRequestBuilder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, range[0]);
+
                                 // Finally, we start displaying the camera preview.
                                 previewRequest = previewRequestBuilder.build();
 
@@ -608,5 +846,4 @@ public class CameraFragment extends Fragment {
             Log.e(TAG, "Exception!" + e.getMessage());
         }
     }
-
 }

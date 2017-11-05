@@ -43,31 +43,7 @@ public class MainActivity extends AppCompatActivity {
             requestPermission();
         }
 
-        // Sample Request
-        String content = getString(R.string.SampleString);
-        VisionImageObject image = new VisionImageObject();
-        image.setContent(content);
 
-        VisionFeatureObject feature1 = new VisionFeatureObject();
-        feature1.setType("LOGO_DETECTION");
-        feature1.setMaxResult(1);
-
-        VisionFeatureObject feature2 = new VisionFeatureObject();
-        feature2.setType("LABEL_DETECTION");
-        feature2.setMaxResult(1);
-
-        VisionRequest requestData = new VisionRequest();
-        requestData.setImage(image);
-        requestData.setFeatures(new ArrayList<VisionFeatureObject>());
-        requestData.getFeatures().add(feature1);
-        requestData.getFeatures().add(feature2);
-
-        VisionRequestWrapper requests = new VisionRequestWrapper();
-        requests.setRequests(new ArrayList<VisionRequest>());
-        requests.getRequests().add(requestData);
-
-        // ApiUtil.sendPostVisionAPI();
-        ApiUtil.sendPostVisionAPI(requests);
 
     }
     @Override
