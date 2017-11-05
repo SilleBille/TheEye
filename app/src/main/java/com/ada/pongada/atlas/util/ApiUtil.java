@@ -1,12 +1,18 @@
 package com.ada.pongada.atlas.util;
 
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 
+import com.ada.pongada.atlas.MainActivity;
 import com.ada.pongada.atlas.client.VisionAPIClient;
 import com.ada.pongada.atlas.client.VisionAPIService;
 import com.ada.pongada.atlas.pojo.VisionLabelObject;
 import com.ada.pongada.atlas.pojo.VisionRequestWrapper;
+import com.ada.pongada.atlas.pojo.VisionResponse;
 import com.ada.pongada.atlas.pojo.VisionResponseWrapper;
+import com.ada.pongada.atlas.tts.TextToSpeechAPI;
+
+import java.util.Locale;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -40,6 +46,7 @@ public class ApiUtil {
                 if(response.isSuccessful()) {
                     Log.i("TAG", "Post submitted and successful " + response.body().toString());
                     Log.i("TAG", "VALULEJLFKJSDLKF: " + response.body().getResponses().get(0).getLabelAnnotations().get(0).getDescription());
+                    final VisionResponse result = (VisionResponse) response.body().getResponses().get(0);
                 }
             }
 

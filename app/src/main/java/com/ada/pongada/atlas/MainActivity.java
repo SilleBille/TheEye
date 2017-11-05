@@ -1,31 +1,43 @@
 package com.ada.pongada.atlas;
 
 import android.Manifest;
+import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import com.ada.pongada.atlas.client.VisionAPIClient;
+import com.ada.pongada.atlas.client.VisionAPIService;
 import com.ada.pongada.atlas.pojo.VisionFeatureObject;
 import com.ada.pongada.atlas.pojo.VisionImageObject;
 import com.ada.pongada.atlas.pojo.VisionRequest;
 import com.ada.pongada.atlas.pojo.VisionRequestWrapper;
+import com.ada.pongada.atlas.pojo.VisionResponse;
+import com.ada.pongada.atlas.pojo.VisionResponseWrapper;
+import com.ada.pongada.atlas.tts.TextToSpeechAPI;
 import com.ada.pongada.atlas.util.ApiUtil;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
     private static final String PERMISSION_STORAGE = Manifest.permission.WRITE_EXTERNAL_STORAGE;
     private static final int PERMISSIONS_REQUEST = 32;
+
+    private TextToSpeech tts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +46,21 @@ public class MainActivity extends AppCompatActivity {
         //Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         //setSupportActionBar(toolbar);
 
+        // Text to Speech Init
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    int result = tts.setLanguage(Locale.US);
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.e("TTS", "This Language is not supported");
+                    }
+                    //TextToSpeechAPI.speak(tts, "In the GitHub project I have included more examples for you to experiment with and build your own Android assistant.");
+                } else {
+                    Log.e("TTS", "Initilization Failed!");
+                }
+            }
+        });
 
         if (hasPermission()) {
             if (null == savedInstanceState) {
@@ -67,7 +94,8 @@ public class MainActivity extends AppCompatActivity {
         requests.getRequests().add(requestData);
 
         // ApiUtil.sendPostVisionAPI();
-        ApiUtil.sendPostVisionAPI(requests);
+        AsyncTaskRunner runner = new AsyncTaskRunner();
+        runner.execute(requests);
 
     }
     @Override
@@ -137,4 +165,37 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
+
+    private class AsyncTaskRunner extends AsyncTask<VisionRequestWrapper, String, VisionResponse> {
+        private VisionResponse result;
+
+        public static final String VISION_BASE_URI = "https://vision.googleapis.com";
+        public static final String GOOGLE_API_KEY = "AIzaSyDQiKa6VOASACrBABdepX8x_aoYn03CPGU";
+
+        public VisionAPIService getVisionAPIService() {
+            return VisionAPIClient.getClient(VISION_BASE_URI).create(VisionAPIService.class);
+        }
+
+        @Override
+        protected VisionResponse doInBackground(VisionRequestWrapper... data) {
+            try {
+                ApiUtil.sendPostVisionAPI(data[0]);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return result;
+        }
+
+        @Override
+        protected void onPostExecute(VisionResponse result) {
+            Log.i("TAG", "In Post Execute...");
+            if (result != null) {
+                TextToSpeechAPI.speak(tts, result
+                        .getLabelAnnotations().get(0)
+                        .getDescription());
+            }
+        }
+    }
+
 }
