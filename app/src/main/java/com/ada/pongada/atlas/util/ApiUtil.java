@@ -2,6 +2,7 @@ package com.ada.pongada.atlas.util;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.widget.Toast;
@@ -17,9 +18,11 @@ import com.ada.pongada.atlas.tts.TextToSpeechAPI;
 
 import org.json.JSONObject;
 
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -34,10 +37,12 @@ import static android.R.id.message;
 
 public class ApiUtil {
 
-    private ApiUtil() {}
-
     public static final String VISION_BASE_URI = "https://vision.googleapis.com";
     public static final String GOOGLE_API_KEY = "AIzaSyDQiKa6VOASACrBABdepX8x_aoYn03CPGU";
+    public static SharedPreferences sharedpreferences;
+
+    private ApiUtil() {
+    }
 
     public static VisionAPIService getVisionAPIService() {
         return VisionAPIClient.getClient(VISION_BASE_URI).create(VisionAPIService.class);
@@ -47,6 +52,8 @@ public class ApiUtil {
                                          final TextToSpeech tts) {
         VisionAPIService vision;
         vision = getVisionAPIService();
+
+        sharedpreferences = context.getSharedPreferences("Retina", Context.MODE_PRIVATE);
 
         vision.savePost(GOOGLE_API_KEY, request).enqueue(new Callback<VisionResponseWrapper>() {
             @Override
@@ -76,13 +83,13 @@ public class ApiUtil {
 
                             String brand = "";
                             if (logo.size() > 0) {
-                                brand += "Brand ";
+                                //brand += "Brand ";
                                 brand += logo.toArray()[0];
                             }
 
                             String label = "";
                             if (labels.size() > 0) {
-                                label += "Labels ";
+                                //label += "Labels ";
                                 for (String t: labels) {
                                     label += t + ", ";
                                 }
@@ -91,15 +98,39 @@ public class ApiUtil {
                             String text = "";
                             if (brand.length() > 0) {
                                 text += brand;
-                                text += ".";
+                                text += ", ";
                             }
 
                             if (label.length() > 0) {
                                 text += label;
                             }
 
-                            if (text.length() > 0)
-                                TextToSpeechAPI.speak(tts, text);
+                            if (text.length() > 0) {
+                                    Set<String> shoppingList = sharedpreferences.getStringSet("sl",new TreeSet<String>());
+                                    Iterator iterator = shoppingList.iterator();
+                                    String talk = null;
+                                    boolean flag = false;
+                                    while(iterator.hasNext()){
+                                        String currentString = (String)iterator.next();
+                                        String text1 = text.replace(",","");
+                                        String words[] = text1.split(" ");
+                                        for(int i=0;i<words.length;++i)
+                                        {
+                                            if(words[i].equalsIgnoreCase(currentString)){
+                                                flag = true;
+                                                shoppingList.remove(currentString);
+                                                talk = currentString;
+                                                SharedPreferences.Editor editor = sharedpreferences.edit();
+                                                editor.putStringSet("sl",shoppingList);
+                                                editor.commit();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if(flag && talk!=null) {
+                                        TextToSpeechAPI.speak(tts, talk);
+                                    }
+                            }
 
                         }
                     });
