@@ -133,7 +133,7 @@ public class CameraFragment extends Fragment {
                 public void onSurfaceTextureAvailable(
                         final SurfaceTexture texture, final int width, final int height) {
                     openCamera(width, height);
-                    pastTime = System.currentTimeMillis();
+                    pastTime = 0;
                 }
 
                 @Override
