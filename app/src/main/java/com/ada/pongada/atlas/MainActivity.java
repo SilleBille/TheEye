@@ -4,11 +4,13 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,9 +20,11 @@ import com.ada.pongada.atlas.pojo.VisionFeatureObject;
 import com.ada.pongada.atlas.pojo.VisionImageObject;
 import com.ada.pongada.atlas.pojo.VisionRequest;
 import com.ada.pongada.atlas.pojo.VisionRequestWrapper;
+import com.ada.pongada.atlas.tts.TextToSpeechAPI;
 import com.ada.pongada.atlas.util.ApiUtil;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
@@ -33,6 +37,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         //Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         //setSupportActionBar(toolbar);
+        //TextToSpeechAPI.speak(tts, "In the GitHub project I have included more examples for you to experiment with and build your own Android assistant.");
+
 
 
         if (hasPermission()) {

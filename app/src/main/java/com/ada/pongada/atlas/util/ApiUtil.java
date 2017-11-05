@@ -2,6 +2,7 @@ package com.ada.pongada.atlas.util;
 
 import android.app.Activity;
 import android.content.Context;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -12,10 +13,13 @@ import com.ada.pongada.atlas.pojo.VisionLogoObject;
 import com.ada.pongada.atlas.pojo.VisionRequestWrapper;
 import com.ada.pongada.atlas.pojo.VisionResponse;
 import com.ada.pongada.atlas.pojo.VisionResponseWrapper;
+import com.ada.pongada.atlas.tts.TextToSpeechAPI;
 
 import org.json.JSONObject;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -39,7 +43,8 @@ public class ApiUtil {
         return VisionAPIClient.getClient(VISION_BASE_URI).create(VisionAPIService.class);
     }
 
-    public static void sendPostVisionAPI(VisionRequestWrapper request, final Context context, final Activity ac) {
+    public static void sendPostVisionAPI(VisionRequestWrapper request, final Context context, final Activity ac,
+                                         final TextToSpeech tts) {
         VisionAPIService vision;
         vision = getVisionAPIService();
 
@@ -56,15 +61,45 @@ public class ApiUtil {
                             // JSONObject jb = response.body().getResponses().get(0).getLabelAnnotations().get(0).getDescription())
                             List<VisionLabelObject> rsL = response.body().getResponses().get(0).getLabelAnnotations();
                             List<VisionLogoObject> rsLogo = response.body().getResponses().get(0).getLogoAnnotations();
+                            Set<String> logo = new LinkedHashSet<String>();
+                            Set<String> labels = new LinkedHashSet<String>();
 
                             for(int i=0; rsL!= null && i<rsL.size(); i++) {
                                 Log.i("Label", rsL.get(i).getDescription());
+                                labels.add(rsL.get(i).getDescription());
                             }
+
                             for(int i=0; rsLogo!=null && i<rsLogo.size(); i++) {
                                 Log.i("LOGO", rsLogo.get(i).getDescription());
+                                logo.add(rsLogo.get(i).getDescription());
                             }
 
+                            String brand = "";
+                            if (logo.size() > 0) {
+                                brand += "Brand ";
+                                brand += logo.toArray()[0];
+                            }
 
+                            String label = "";
+                            if (labels.size() > 0) {
+                                label += "Labels ";
+                                for (String t: labels) {
+                                    label += t + ", ";
+                                }
+                            }
+
+                            String text = "";
+                            if (brand.length() > 0) {
+                                text += brand;
+                                text += ".";
+                            }
+
+                            if (label.length() > 0) {
+                                text += label;
+                            }
+
+                            if (text.length() > 0)
+                                TextToSpeechAPI.speak(tts, text);
 
                         }
                     });

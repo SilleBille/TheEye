@@ -47,6 +47,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.speech.tts.TextToSpeech;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
@@ -80,6 +81,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -297,6 +299,20 @@ public class CameraFragment extends Fragment {
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+        tts = new TextToSpeech(getActivity(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    int result = tts.setLanguage(Locale.US);
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.e("TTS", "This Language is not supported");
+                    }
+
+                } else {
+                    Log.e("TTS", "Initilization Failed!");
+                }
+            }
+        });
 //        mFile = new File("/storage/emulated/0/", "pic.jpg");
     }
 
@@ -614,6 +630,7 @@ public class CameraFragment extends Fragment {
             e.printStackTrace();
         }
     }
+    private TextToSpeech tts;
 
     private final ImageReader.OnImageAvailableListener mOnImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
@@ -637,9 +654,9 @@ public class CameraFragment extends Fragment {
             Log.i(TAG, "InsideImage LIstener");
             //writeToFile(output);
             long currentTime = System.currentTimeMillis();
-            if(currentTime - pastTime > 2000) {
+            if(currentTime - pastTime > 3000) {
                 Log.i(TAG, "Sending Request");
-                createRequestAndSend(output);
+                createRequestAndSend(output, tts);
                 pastTime = currentTime;
                 writeToFile(output);
             }
@@ -649,7 +666,7 @@ public class CameraFragment extends Fragment {
 
     };
 
-    public void createRequestAndSend(String base64Img) {
+    public void createRequestAndSend(String base64Img, TextToSpeech tts) {
         // Sample Request
         String content = base64Img;
         //String content = getString(R.string.SampleString);
@@ -675,7 +692,7 @@ public class CameraFragment extends Fragment {
         requests.getRequests().add(requestData);
 
         // ApiUtil.sendPostVisionAPI();
-        ApiUtil.sendPostVisionAPI(requests, getContext(), getActivity());
+        ApiUtil.sendPostVisionAPI(requests, getContext(), getActivity(), tts);
     }
 
     public void writeToFile(String data)
